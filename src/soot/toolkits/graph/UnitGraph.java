@@ -35,11 +35,25 @@ import java.util.Map;
 
 import soot.Body;
 import soot.G;
+import soot.RefType;
+import soot.SootClass;
 import soot.SootMethod;
+import soot.SootMethodRef;
 import soot.Unit;
 import soot.UnitBox;
+import soot.Value;
+import soot.VoidType;
+import soot.jimple.InstanceInvokeExpr;
+import soot.jimple.InvokeExpr;
+import soot.jimple.InvokeStmt;
+import soot.jimple.Stmt;
+import soot.jimple.VirtualInvokeExpr;
+import soot.jimple.internal.JInvokeStmt;
+import soot.jimple.internal.JVirtualInvokeExpr;
 import soot.options.Options;
 import soot.util.Chain;
+import soot.SootMethodRefImpl;
+import soot.Type;
 
 /**
  * <p>
@@ -78,6 +92,66 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 		if (Options.v().verbose())
 			G.v().out.println("[" + method.getName() + "]     Constructing "
 					+ this.getClass().getName() + "...");
+		
+		//XIANG 
+		Iterator<Unit> unitIt = unitChain.iterator();
+		Unit currentUnit = null;
+		Unit nextUnit = unitIt.hasNext() ? (Unit) unitIt.next() : null;
+		Value savedListener = null;
+		SootClass listenerCls = null;
+		while (nextUnit != null) {
+			currentUnit = nextUnit;
+			nextUnit = unitIt.hasNext() ? (Unit) unitIt.next() : null;
+			//XIANG
+			if(currentUnit instanceof Stmt){
+				Stmt s = (Stmt)currentUnit;
+				if(s.containsInvokeExpr() && s.getInvokeExpr() instanceof InstanceInvokeExpr){
+					InstanceInvokeExpr ie = (InstanceInvokeExpr)s.getInvokeExpr();
+					SootMethod sm = s.getInvokeExpr().getMethod();
+					if(sm.getName().equals("<init>") && sm.getDeclaringClass().toString().contains("$")){
+						savedListener = ie.getBase(); 
+						listenerCls = sm.getDeclaringClass();
+//						System.out.println("TEST1: "+s);
+//						System.out.println("  N:"+nextUnit);
+					}
+					if(savedListener!=null && sm.getName().equals("setOnClickListener")){
+						//InstanceInvokeExpr iie = new JVirtualInvokeExpr();
+//						System.out.println("TEST2:"+s+" ||"+ s.getInvokeExpr().getClass().toString());
+//						System.out.println("  Details:BTN:"+ie.getBase()+" VIEW:"+savedView+" LN:"+listenerCls.getMethodByName("onClick"));
+						SootMethod onClickMethod = listenerCls.getMethodByName("onClick");
+						SootMethodRef onClickMethodRef = new SootMethodRefImpl(listenerCls,onClickMethod.getName(), 
+								onClickMethod.getParameterTypes(), onClickMethod.getReturnType(), false);
+						List<Value> args = new ArrayList<Value>();
+						args.add(savedListener);
+						InstanceInvokeExpr iie = new JVirtualInvokeExpr(savedListener, onClickMethodRef, args);
+						JInvokeStmt jis = new JInvokeStmt(iie);
+					
+//						System.out.println("  NewInvokExpr:"+jis+" HASBODY:"+onClickMethod.hasActiveBody());
+						if(iie.getMethod().hasActiveBody())
+							System.out.println("  SIZE:"+iie.getMethod().getActiveBody().getUnits().size());
+						if(nextUnit!=null && nextUnit instanceof Stmt){
+							Stmt ns = (Stmt)nextUnit;
+							if(ns.containsInvokeExpr() && ns.getInvokeExpr().getMethod().getName().equals("onClick")){
+								
+							}
+							else
+								unitChain.insertAfter(jis, currentUnit);
+						}
+						break;
+						//TODO
+						//sm.getDeclaringClass().getNa
+					}
+//					if(sm.getName().equals("onClick")){
+//						System.out.println("TEST3: Base:"+ie.getBase()+" Arg:"+s.getInvokeExpr().getArg(0));
+//						System.out.println(sm.getReturnType());
+//						System.out.println(sm.getParameterType(0));
+//						
+//					}
+				}
+			}
+		}
+		//==============================================================
+		
 
 	}
 
@@ -103,13 +177,12 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 			Map<Unit, List<Unit>> unitToPreds) {
 		Iterator<Unit> unitIt = unitChain.iterator();
 		Unit currentUnit, nextUnit;
-
 		nextUnit = unitIt.hasNext() ? (Unit) unitIt.next() : null;
-
+		
 		while (nextUnit != null) {
 			currentUnit = nextUnit;
 			nextUnit = unitIt.hasNext() ? (Unit) unitIt.next() : null;
-
+			
 			ArrayList<Unit> successors = new ArrayList<Unit>();
 
 			if (currentUnit.fallsThrough()) {
@@ -149,7 +222,9 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 				successors.trimToSize();
 				unitToSuccs.put(currentUnit, successors);
 			}
+			
 		}
+		
 	}
 
 	/**

@@ -40,7 +40,7 @@ import soot.util.NumberedString;
  * procedure in the Java Virtual Machine Specification, 2nd ed, section 5.4.3.3.
  */
 
-class SootMethodRefImpl implements SootMethodRef {
+public class SootMethodRefImpl implements SootMethodRef {
     public SootMethodRefImpl( 
             SootClass declaringClass,
             String name,
