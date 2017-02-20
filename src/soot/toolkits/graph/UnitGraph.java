@@ -34,7 +34,9 @@ import java.util.List;
 import java.util.Map;
 
 import soot.Body;
+import soot.BooleanType;
 import soot.G;
+import soot.Local;
 import soot.RefType;
 import soot.SootClass;
 import soot.SootMethod;
@@ -43,13 +45,17 @@ import soot.Unit;
 import soot.UnitBox;
 import soot.Value;
 import soot.VoidType;
+import soot.dava.internal.javaRep.DIntConstant;
 import soot.jimple.InstanceInvokeExpr;
+import soot.jimple.IntConstant;
 import soot.jimple.InvokeExpr;
 import soot.jimple.InvokeStmt;
+import soot.jimple.NullConstant;
 import soot.jimple.Stmt;
 import soot.jimple.VirtualInvokeExpr;
 import soot.jimple.internal.JInvokeStmt;
 import soot.jimple.internal.JVirtualInvokeExpr;
+import soot.jimple.internal.JimpleLocal;
 import soot.options.Options;
 import soot.util.Chain;
 import soot.SootMethodRefImpl;
@@ -76,6 +82,7 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 	protected SootMethod method;
 	protected Body body;
 	protected Chain<Unit> unitChain;
+	static int newLocalCount = 177;
 
 	/**
 	 * Performs the work that is required to construct any sort of
@@ -94,27 +101,97 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 					+ this.getClass().getName() + "...");
 		
 		//XIANG 
-		Iterator<Unit> unitIt = unitChain.iterator();
+		//TODO: deal with myltiple parameter's class
+		//TODO: remove dummymain class.
+		Iterator<Unit> unitIt = unitChain.snapshotIterator();
+		List<String> eventList = new ArrayList<String>();
+		eventList.add("onClick");
+		eventList.add("onLongClick");
+		eventList.add("onFocusChange"); //View v, boolean hasFocus
+		eventList.add("onFocusChanged"); //View v, boolean hasFocus
+		eventList.add("onKey"); //View v, int keyCode, KeyEvent event
+		eventList.add("onKeyDown"); //int keyCode, KeyEvent event
+		eventList.add("onKeyUp");  //int keyCode, KeyEvent event
+		eventList.add("onKeyLongPress"); //int keyCode, KeyEvent event
+		eventList.add("onTouchEvent");  //MotionEvent event
+		eventList.add("onTouch"); //View v, MotionEvent event
+		
+		
 		Unit currentUnit = null;
 		Unit nextUnit = unitIt.hasNext() ? (Unit) unitIt.next() : null;
 		Value savedListener = null;
 		SootClass listenerCls = null;
+		int count = 0;
 		while (nextUnit != null) {
 			currentUnit = nextUnit;
 			nextUnit = unitIt.hasNext() ? (Unit) unitIt.next() : null;
 			//XIANG
+			//TODO: add other event callbacks.
 			if(currentUnit instanceof Stmt){
 				Stmt s = (Stmt)currentUnit;
 				if(s.containsInvokeExpr() && s.getInvokeExpr() instanceof InstanceInvokeExpr){
 					InstanceInvokeExpr ie = (InstanceInvokeExpr)s.getInvokeExpr();
 					SootMethod sm = s.getInvokeExpr().getMethod();
-					if(sm.getName().equals("<init>") && sm.getDeclaringClass().toString().contains("$")){
+					//if(sm.getName().equals("<init>") && sm.getDeclaringClass().toString().contains("$")){
+					if(sm.getName().equals("<init>")){
 						savedListener = ie.getBase(); 
 						listenerCls = sm.getDeclaringClass();
-//						System.out.println("TEST1: "+s);
-//						System.out.println("  N:"+nextUnit);
+						
+						if(!listenerCls.isApplicationClass())
+							continue;
+						if(listenerCls.isJavaLibraryClass() || listenerCls.isLibraryClass() || listenerCls.isPhantom())
+							continue;
+						
+						for(String methodName : eventList){
+							//extract method from class
+							SootMethod eventMethod = null;
+							try{
+								eventMethod = listenerCls.getMethodByName(methodName);
+							}
+							catch(Exception e){}
+							if(eventMethod == null) continue;
+							//TODO: it could be multiple parameters
+							//if(eventMethod.getParameterCount() != 1) continue;
+							
+							//create method ref for building instrument
+							SootMethodRef eventMethodRef = new SootMethodRefImpl(listenerCls,eventMethod.getName(), 
+									eventMethod.getParameterTypes(), eventMethod.getReturnType(), false);
+							List<Value> args = new ArrayList<Value>();
+							for(int i=0; i<eventMethod.getParameterCount(); i++){
+								//args.add(NullConstant.v());
+								Type t = eventMethod.getParameterTypes().get(i);
+								System.out.println("TYPE: "+t.getEscapedName());
+								if(t.getEscapedName().equals("int")){
+									args.add(IntConstant.v(0));
+								}
+								else if(t.getEscapedName().equals("boolean")){
+									DIntConstant d = DIntConstant.v(0, BooleanType.v());
+									args.add(d);
+								}
+								else{
+									args.add(NullConstant.v());
+								}
+							}
+							
+							InstanceInvokeExpr iie = new JVirtualInvokeExpr(savedListener, eventMethodRef, args);
+							JInvokeStmt jis = new JInvokeStmt(iie);
+//							System.out.println("ADDED NEW INSTR:"+listenerCls.isApplicationClass()+" "+jis+" "+body.getMethod().getName()+"@"+listenerCls);
+//							System.out.println("  ApplicationCls:"+listenerCls.isApplicationClass()+" JAVA:"+listenerCls.isJavaLibraryClass()+"  L:"+listenerCls.isLibraryClass()+" Phantom:"+listenerCls.isPhantom());
+							if(nextUnit!=null && nextUnit instanceof Stmt){
+								Stmt ns = (Stmt)nextUnit;
+								if(!ns.containsInvokeExpr() || !ns.getInvokeExpr().getMethod().getName().equals(methodName)){
+									unitChain.insertAfter(jis, currentUnit);
+									count++;
+								}
+							}
+							else{
+								unitChain.insertAfter(jis, currentUnit);
+								count++;
+							}
+						}
 					}
-					if(savedListener!=null && sm.getName().equals("setOnClickListener")){
+					
+					/*if(savedListener!=null && sm.getName().equals("setOnClickListener")){
 						//InstanceInvokeExpr iie = new JVirtualInvokeExpr();
 //						System.out.println("TEST2:"+s+" ||"+ s.getInvokeExpr().getClass().toString());
 //						System.out.println("  Details:BTN:"+ie.getBase()+" VIEW:"+savedView+" LN:"+listenerCls.getMethodByName("onClick"));
@@ -125,22 +202,27 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 						args.add(savedListener);
 						InstanceInvokeExpr iie = new JVirtualInvokeExpr(savedListener, onClickMethodRef, args);
 						JInvokeStmt jis = new JInvokeStmt(iie);
-					
+						System.out.println("XXYYZZ:"+savedListener+" VS "+ie.getArg(0));
+						System.out.println("   [" + method.getName() + "]     Constructing "
+								+ method.getDeclaringClass().getName() + "...");
 //						System.out.println("  NewInvokExpr:"+jis+" HASBODY:"+onClickMethod.hasActiveBody());
-						if(iie.getMethod().hasActiveBody())
-							System.out.println("  SIZE:"+iie.getMethod().getActiveBody().getUnits().size());
+//						if(iie.getMethod().hasActiveBody())
+//							System.out.println("  SIZE:"+iie.getMethod().getActiveBody().getUnits().size());
 						if(nextUnit!=null && nextUnit instanceof Stmt){
 							Stmt ns = (Stmt)nextUnit;
 							if(ns.containsInvokeExpr() && ns.getInvokeExpr().getMethod().getName().equals("onClick")){
 								
 							}
-							else
+							else{
 								unitChain.insertAfter(jis, currentUnit);
+								count++;
+							}
 						}
-						break;
+						//break;
 						//TODO
 						//sm.getDeclaringClass().getNa
 					}
+					*/
 //					if(sm.getName().equals("onClick")){
 //						System.out.println("TEST3: Base:"+ie.getBase()+" Arg:"+s.getInvokeExpr().getArg(0));
 //						System.out.println(sm.getReturnType());
@@ -149,6 +231,11 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 //					}
 				}
 			}
+		}
+		if(count >= 2){
+			System.out.println("Added more than 2 onClicks");
+			System.out.println("   [" + method.getName() + "]     Constructing "
+					+ method.getDeclaringClass().getName() + "...");
 		}
 		//==============================================================
 		
