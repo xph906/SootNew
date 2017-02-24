@@ -160,7 +160,7 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 							for(int i=0; i<eventMethod.getParameterCount(); i++){
 								//args.add(NullConstant.v());
 								Type t = eventMethod.getParameterTypes().get(i);
-								System.out.println("TYPE: "+t.getEscapedName());
+								//System.out.println("TYPE: "+t.getEscapedName());
 								if(t.getEscapedName().equals("int")){
 									args.add(IntConstant.v(0));
 								}
