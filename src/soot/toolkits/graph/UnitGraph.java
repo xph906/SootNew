@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import nu.NUSootConfig;
 import soot.Body;
 import soot.BooleanType;
 import soot.G;
@@ -100,6 +101,9 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 			G.v().out.println("[" + method.getName() + "]     Constructing "
 					+ this.getClass().getName() + "...");
 		
+		NUSootConfig config = NUSootConfig.getInstance();
+		if(!config.isEnableGraphEnhance())
+			return ;
 		//XIANG 
 		//TODO: deal with myltiple parameter's class
 		//TODO: remove dummymain class.
@@ -137,10 +141,10 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 						savedListener = ie.getBase(); 
 						listenerCls = sm.getDeclaringClass();
 						
-						if(!listenerCls.isApplicationClass())
-							continue;
-						if(listenerCls.isJavaLibraryClass() || listenerCls.isLibraryClass() || listenerCls.isPhantom())
-							continue;
+//						if(!listenerCls.isApplicationClass())
+//							continue;
+//						if(listenerCls.isJavaLibraryClass() || listenerCls.isLibraryClass() || listenerCls.isPhantom())
+//							continue;
 						
 						for(String methodName : eventList){
 							//extract method from class
@@ -157,6 +161,7 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 							SootMethodRef eventMethodRef = new SootMethodRefImpl(listenerCls,eventMethod.getName(), 
 									eventMethod.getParameterTypes(), eventMethod.getReturnType(), false);
 							List<Value> args = new ArrayList<Value>();
+							boolean doContinue = false;
 							for(int i=0; i<eventMethod.getParameterCount(); i++){
 								//args.add(NullConstant.v());
 								Type t = eventMethod.getParameterTypes().get(i);
@@ -169,9 +174,14 @@ public abstract class UnitGraph implements DirectedGraph<Unit> {
 									args.add(d);
 								}
 								else{
-									args.add(NullConstant.v());
+									if(savedListener.equals(NullConstant.v())){
+										doContinue = true;
+										break;
+									}
+									args.add(savedListener);
 								}
 							}
+							if(doContinue) continue;
 							
 							InstanceInvokeExpr iie = new JVirtualInvokeExpr(savedListener, eventMethodRef, args);
 							JInvokeStmt jis = new JInvokeStmt(iie);
