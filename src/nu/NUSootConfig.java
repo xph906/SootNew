@@ -25,17 +25,24 @@ public class NUSootConfig {
 	//Indicate whether adding event (e.g., onClick) InvokeExpr Stmt 
 	//after each listener is initialized.
 	private boolean graphEnhanceEnabled; 
+	//Disable data-flow analysis on constant propagation by default.
+	private boolean fastConstantPropogationAnalysis; 
+	//Disable inter-component flow analysis by default.
+	private boolean interComponentAnalysisEnabled;
 	private List<String> uiEventCallbackList; //UI event callback function list
 	private String fullAPKFilePath;           //target APK's location
 	private String androidJarPath;            //android platforms' path
 	private String apkToolPath;               //apktool location
 	private String decompiledAPKOutputPath;   //output path for decompiled apk
-
+	
+	
 	private NUSootConfig(){
 		graphEnhanceEnabled = false;
+		fastConstantPropogationAnalysis = true;
 		initializeUIEventCallbackList();
 	}
 	
+
 	/***Setter***/
 	public void setGraphEnhanceEnabled(boolean enableGraphEnhance) {
 		this.graphEnhanceEnabled = enableGraphEnhance;
@@ -72,6 +79,14 @@ public class NUSootConfig {
 		}
 		this.decompiledAPKOutputPath = decompiledAPKOutputPath;
 	}
+	public void setFastConstantPropogationAnalysis(
+			boolean fastConstantPropogationAnalysis) {
+		this.fastConstantPropogationAnalysis = fastConstantPropogationAnalysis;
+	}
+	public void setInterComponentAnalysisEnabled(
+			boolean interComponentAnalysisEnabled) {
+		this.interComponentAnalysisEnabled = interComponentAnalysisEnabled;
+	}
 	
 	/***Getter***/
 	public boolean isGraphEnhanceEnhanced() {
@@ -91,6 +106,12 @@ public class NUSootConfig {
 	}
 	public String getDecompiledAPKOutputPath() {
 		return decompiledAPKOutputPath;
+	}
+	public boolean isFastConstantPropogationAnalysis() {
+		return fastConstantPropogationAnalysis;
+	}
+	public boolean isInterComponentAnalysisEnabled() {
+		return interComponentAnalysisEnabled;
 	}
 	
 	/***Internal Methods***/
