@@ -4,6 +4,7 @@ import heros.DontSynchronize;
 import heros.SynchronizedBy;
 import heros.solver.IDESolver;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import nu.NUDisplay;
 import soot.Body;
 import soot.SootMethod;
 import soot.Unit;
@@ -93,11 +95,22 @@ public abstract class AbstractJimpleBasedICFG implements BiDiInterproceduralCFG<
 
 	@Override
 	public DirectedGraph<Unit> getOrCreateUnitGraph(SootMethod m) {
+		
 		return getOrCreateUnitGraph(m.getActiveBody());
 	}
 
 	public DirectedGraph<Unit> getOrCreateUnitGraph(Body body) {
-		return bodyToUnitGraph.getUnchecked(body);
+		if(body == null) return null;
+		
+		
+		DirectedGraph<Unit> rs = null;
+		try{
+			rs = bodyToUnitGraph.getUnchecked(body);
+		}
+		catch(Exception e){
+			NUDisplay.error("exception: "+e.toString(),null);
+		}
+		return rs;
 	}
 
 	protected DirectedGraph<Unit> makeGraph(Body body) {
@@ -192,6 +205,7 @@ public abstract class AbstractJimpleBasedICFG implements BiDiInterproceduralCFG<
 		assert u != null;
 		Body body = unitToOwner.get(u);
 		DirectedGraph<Unit> unitGraph = getOrCreateUnitGraph(body);
+		if(unitGraph==null) return new ArrayList<Unit>();
 		return unitGraph.getPredsOf(u);
 	}
 
