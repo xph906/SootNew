@@ -118,8 +118,15 @@ public class JLookupSwitchStmt extends AbstractSwitchStmt
         }
 
         Unit target = getDefaultTarget();
+        //XIANG fix an infinite-loop bug
+        String targetSig = null;
+        if(target==this || target.getClass().toString().equals(target.getClass().toString()))
+        	targetSig = "self";
+        else
+        	targetSig = target.toString();
+        
         buffer.append("    " +  Jimple.DEFAULT + ": " +  Jimple.GOTO + " " +
-            (target == this ? "self" : target) + ";" + endOfLine);
+        		targetSig + ";" + endOfLine);
 
         buffer.append("}");
 
